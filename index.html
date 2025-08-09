@@ -1,13 +1,1213 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Your Web App</title>
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-title" content="周易">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <title>YiJing Web App</title>
+    <style>
+        /* Basic Styling for Layout */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f2f2f2;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* App Layout Styling */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .taichi-image {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 10px;
+        }
+
+        .input-field {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            background-color: #e0e0e0;
+        }
+
+        .button {
+            padding: 10px 20px;
+            margin: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .result-text, .gua-section, .yao-image {
+            margin: 10px 0;
+        }
+
+        .button:disabled {
+            background-color: #b0c4de;
+            cursor: not-allowed;
+        }
+
+
+        /* Timestamp and small helper text */
+        .timestamp { margin-top: 12px; font-size: 0.9em; color: #666; }
+
+        /* 用 CSS 畫爻線，不用圖片 */
+        .yao-line { height: 10px; width: 140px; margin: 10px 0; background: #000; }
+        /* 年輕的陰/陽 */
+        .yao-line.yin  { background: linear-gradient(to right, #000 44%, transparent 44% 56%, #000 56%); }
+        .yao-line.yang { background: #000; }
+        /* 變爻（老陰=6、老陽=9）用紅色顯示 */
+        .yao-line.yin6  { background: linear-gradient(to right, red 44%, transparent 44% 56%, red 56%); }
+        .yao-line.yang9 { background: red; }
+        /* 爻線由下往上排（初爻在最下、上爻在最上） */
+        .yao-images { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+
+    </style>
 </head>
 <body>
-    <h1>Welcome to Your iOS Web App</h1>
+    <div class="app-container">
+        <!-- Display Title Image -->
+        <img src="AssetYiJing/taichi.png" alt="Tai Chi Symbol" class="taichi-image">
+
+        <!-- Main Title -->
+        <h1>周易</h1>
+
+        <!-- User Input Fields -->
+        <input type="text" id="userName" placeholder="輸入姓名" class="input-field">
+        <input type="text" id="userQuestion" placeholder="輸入問題 例：要去美國讀書" class="input-field">
+
+        <!-- Explanation and Submit Buttons -->
+        <div>
+            <button onclick="showExplanation()" class="button">說明</button>
+            <button onclick="generatePrediction()" class="button">提問</button>
+            <button id="btnStart" class="button">開始</button>
+            <button id="btnShot" class="button">截圖</button>
+        </div>
+
+        <!-- Result Text -->
+        <div id="resultText" class="result-text">卦曰：來者何人？欲問何事？</div>
+
+        <!-- Main Gua Display Sections -->
+        <div class="gua-section">
+            <h2>本卦</h2>
+            <div id="hGuaName"></div>
+            <div id="hGuaImages" class="yao-images"></div>
+        </div>
+
+        <div class="gua-section">
+            <h2>之卦</h2>
+            <div id="gGuaName"></div>
+            <div id="gGuaImages" class="yao-images"></div>
+        </div>
+
+        <!-- Footer for Explanations -->
+        <div id="guaExplanation" class="gua-section"></div>
+        <div id="castTime" class="timestamp"></div>
+    </div>
+
+    <script>
+        // Source: Swift-style guaDictionary pasted from the native app
+        const SWIFT_SOURCE = `
+    let guaDictionary: [String: Gua] = [
+           "yang yang yang yang yang yang": Gua(
+               composition: ["yang", "yang", "yang", "yang", "yang", "yang"],
+               name: "乾",
+               guaExplanation: "元，亨，利，貞。用九：見群龍无首，吉。",
+               yaoExplanations: [
+                   "上九：亢龍有悔。",
+                   "九五：飛龍在天，利見大人。",
+                   "九四：或躍在淵，无咎。",
+                   "九三：君子終日乾乾，夕惕若，厲无咎。",
+                   "九二：見龍在田，利見大人。",
+                   "初九：潛龍，勿用。"
+               ]
+           ),
+           
+           "yin yin yin yin yin yin": Gua(
+               composition: ["yin", "yin", "yin", "yin", "yin", "yin"],
+               name: "坤",
+               guaExplanation: "元亨，利牝馬之貞。君子有攸往，先迷後得主。利西南得朋，東北喪朋。安貞吉。用六：利永貞。",
+               yaoExplanations: [
+                   "上六: 龍戰於野，其血玄黃。",
+                   "六五: 黃裳，元吉。",
+                   "六四: 括囊，無咎無譽。",
+                   "六三: 含章可貞，或從王事，無成有終。",
+                   "六二: 直方大，不習無不利。",
+                   "初六: 履霜，堅冰至。"
+               ]
+           ),
+           "yin yang yin yin yin yang": Gua(
+               composition: ["yin", "yang", "yin", "yin", "yin", "yang"],
+               name: "水雷屯",
+               guaExplanation: "元亨，利貞。勿用有攸往，利建侯。",
+               yaoExplanations: [
+                   "上六：乘馬班如，泣血漣如。",
+                   "九五：屯其膏，小，貞吉，大，貞凶。",
+                   "六四：乘馬班如，求婚媾，往吉，无不利。",
+                   "六三：即鹿无虞，惟入于林中，君子幾，不如舍，往吝。",
+                   "六二：屯如邅如，乘馬班如，匪寇婚媾，女子貞不字，十年乃字。",
+                   "初九：磐桓，利居貞，利建侯。"
+               ]
+           ),
+           "yang yin yin yin yang yin": Gua(
+               composition: ["yang", "yin", "yin", "yin", "yang", "yin"],
+               name: "山水蒙",
+               guaExplanation: "亨。匪我求童蒙，童蒙求我。初筮告，再三瀆，瀆則不告。利貞。",
+               yaoExplanations: [
+                   "上九：擊蒙。不利為寇，利禦寇。",
+                   "六五：童蒙，吉。",
+                   "六四：困蒙，吝。",
+                   "六三：勿用取女，見金夫，不有躬，无攸利。",
+                   "九二：包蒙，吉。納婦，吉；子克家。",
+                   "初六：發蒙，利用刑人，用說桎梏；以往吝。"
+               ]
+           ),
+           "yin yang yin yang yang yang": Gua(
+               composition: ["yin", "yang", "yin", "yang", "yang", "yang"],
+               name: "水天需",
+               guaExplanation: "有孚，光亨，貞吉。利涉大川。",
+               yaoExplanations: [
+                   "上六：入于穴，有不速之客三人來，敬之終吉。",
+                   "九五：需于酒食，貞吉。",
+                   "六四：需于血，出自穴。",
+                   "九三：需于泥，致寇至。",
+                   "九二：需于沙，小有言，終吉。",
+                   "初九：需于郊，利用恆，无咎。"
+               ]
+           ),
+           "yang yang yang yin yang yin": Gua(
+               composition: ["yang", "yang", "yang", "yin", "yang", "yin"],
+               name: "天水訟",
+               guaExplanation: "有孚，窒。惕中吉，終凶。利見大人，不利涉大川。",
+               yaoExplanations: [
+                   "上九：或錫之鞶帶，終朝三褫之。",
+                   "九五：訟，元吉。",
+                   "九四：不克訟，復即命，渝，安貞吉。",
+                   "六三：食舊德，貞厲，終吉，或從王事，無成。",
+                   "九二：不克訟，歸而逋，其邑人三百戶，無眚。",
+                   "初六：不永所事，小有言，終吉。"
+               ]
+           ),
+           "yin yin yin yin yang yin": Gua(
+               composition: ["yin", "yin", "yin", "yin", "yang", "yin"],
+               name: "地水師",
+               guaExplanation: "貞，丈人吉，无咎。",
+               yaoExplanations: [
+                   "上六：大君有命，開國承家，小人勿用。",
+                   "六五：田有禽，利執言，无咎。長子帥師，弟子輿尸，貞凶。",
+                   "六四：師左次，无咎。",
+                   "六三：師或輿尸，凶。",
+                   "九二：在師中，吉，无咎，王三錫命。",
+                   "初六：師出以律，否臧凶。"
+               ]
+           ),
+           "yin yang yin yin yin yin": Gua(
+               composition: ["yin", "yang", "yin", "yin", "yin", "yin"],
+               name: "水地比",
+               guaExplanation: "吉。原筮，元永貞，无咎。不寧方來，後夫凶。",
+               yaoExplanations: [
+                   "上六：比之无首，凶。",
+                   "九五：顯比，王用三驅，失前禽，邑人不誡，吉。",
+                   "六四：外比之，貞吉",
+                   "六三：比之匪人。",
+                   "六二：比之自內，貞吉。",
+                   "初六：有孚比之，无咎。有孚盈缶，終來有他，吉。"
+               ]
+           ),
+           "yang yang yin yang yang yang": Gua(
+               composition: ["yang", "yang", "yin", "yang", "yang", "yang"],
+               name: "風天小畜",
+               guaExplanation: "吉。原筮，元永貞，无咎。不寧方來，後夫凶。",
+               yaoExplanations: [
+                   "上九：既雨既處，尚德載，婦貞厲。月幾望，君子征凶。",
+                   "九五：有孚攣如，富以其鄰。",
+                   "六四：有孚，血去惕出，无咎。",
+                   "九三：輿說輻，夫妻反目。",
+                   "九二：牽復，吉。",
+                   "初九：復自道，何其咎，吉。"
+               ]
+           ),
+           "yang yang yang yin yang yang": Gua(
+               composition: ["yang", "yang", "yang", "yin", "yang", "yang"],
+               name: "天澤履",
+               guaExplanation: "履虎尾，不咥人，亨。",
+               yaoExplanations: [
+                   "上九：視履，考祥，其旋元吉。",
+                   "九五：夬履，貞厲。",
+                   "九四：履虎尾，愬愬，終吉。",
+                   "六三：眇能視，跛能履，履虎尾，咥人，凶。武人为于大君。",
+                   "九二：履道坦坦，幽人貞吉。",
+                   "初九：素履，往无咎。"
+               ]
+           ),
+           "yin yin yin yang yang yang": Gua(
+               composition: ["yin", "yin", "yin", "yang", "yang", "yang"],
+               name: "地天泰",
+               guaExplanation: "小往大來，吉亨。",
+               yaoExplanations: [
+                   "上六：城復于隍，勿用師，自邑告命，貞吝。",
+                   "六五：帝乙歸妹，以祉，元吉。",
+                   "六四：翩翩，不富以其鄰，不戒以孚。",
+                   "九三：无平不陂，无往不復，艱貞无咎。勿恤其孚，于食有福。",
+                   "九二：包荒，用馮河，不遐遺，朋亡，得尚于中行。",
+                   "初九：拔茅茹，以其彙，征吉。"
+               ]
+           ),
+           "yang yang yang yin yin yin": Gua(
+               composition: ["yang", "yang", "yang", "yin", "yin", "yin"],
+               name: "天地否",
+               guaExplanation: "否之匪人，不利君子貞，大往小來。",
+               yaoExplanations: [
+                   "上九：傾否，先否後喜。",
+                   "九五：休否，大人吉。其亡其亡，系于苞桑。",
+                   "九四：有命，无咎，疇離祉。",
+                   "六三：包羞。",
+                   "六二：包承，小人吉，大人否亨。",
+                   "初六：拔茅茹，以其彙，貞吉亨。"
+               ]
+           ),
+           "yang yang yang yang yin yang": Gua(
+               composition: ["yang", "yang", "yang", "yang", "yin", "yang"],
+               name: "天火同人",
+               guaExplanation: "同人於野，亨，利涉大川，利君子貞。",
+               yaoExplanations: [
+                   "上九：同人于郊，无悔。",
+                   "九五：同人，先號咷而後笑，大師克相遇。",
+                   "九四：乘其墉，弗克攻，吉。",
+                   "九三：伏戎于莽，升其高陵，三歲不興。",
+                   "六二：同人于宗，吝。",
+                   "初九：同人于門，无咎。"
+               ]
+           ),
+           "yang yin yang yang yang yang": Gua(
+               composition: ["yang", "yin", "yang", "yang", "yang", "yang"],
+               name: "火天大有",
+               guaExplanation: "元亨。",
+               yaoExplanations: [
+                   "上九：自天祐之，吉，無不利。",
+                   "六五：厥孚交如，威如，吉。",
+                   "九四：匪其彭，無咎。",
+                   "九三：公用亨於天子，小人弗克。",
+                   "九二：大車以載，有攸往，無咎。",
+                   "初九：無交害，匪咎，艱則無咎。"
+               ]
+           ),
+           "yin yin yin yang yin yin": Gua(
+               composition: ["yin", "yin", "yin", "yang", "yin", "yin"],
+               name: "地山謙",
+               guaExplanation: "亨，君子有終。",
+               yaoExplanations: [
+                   "上六：鳴謙，利用行師征邑國。",
+                   "六五：不富以其鄰，利用侵伐，無不利。",
+                   "六四：無不利，撝謙。",
+                   "九三：勞謙，君子有終，吉。",
+                   "六二：鳴謙，貞吉。",
+                   "初六：謙謙君子，用涉大川，吉。"
+               ]
+           ),
+           "yin yin yang yin yin yin": Gua(
+               composition: ["yin", "yin", "yang", "yin", "yin", "yin"],
+               name: "雷地豫",
+               guaExplanation: "利建侯行師。",
+               yaoExplanations: [
+                   "上六：冥豫，成有渝，無咎。",
+                   "六五：貞疾，恆不死。",
+                   "九四：由豫，大有得，勿疑，朋盍簪。",
+                   "六三：盱豫，悔。遲有悔。",
+                   "六二：介于石，不終日，貞吉。",
+                   "初六：鳴豫，凶。"
+               ]
+           ),
+           "yin yang yang yin yin yang": Gua(
+               composition: ["yin", "yang", "yang", "yin", "yin", "yang"],
+               name: "澤雷隨",
+               guaExplanation: "元亨，利貞，無咎。",
+               yaoExplanations: [
+                   "上六：拘係之，乃從維之，王用亨於西山。",
+                   "九五：孚於嘉，吉。",
+                   "九四：隨有獲，貞凶。有孚在道，以明，何咎？",
+                   "六三：係丈夫，失小子，隨有求得，利居貞。",
+                   "六二：係小子，失丈夫。",
+                   "初九：官有渝，貞吉。出門交有功。"
+               ]
+           ),
+           "yang yin yin yang yang yin": Gua(
+               composition: ["yang", "yin", "yin", "yang", "yang", "yin"],
+               name: "山風蠱",
+               guaExplanation: "元亨，利涉大川。先甲三日，後甲三日。",
+               yaoExplanations: [
+                   "上九：不事王侯，高尚其事。",
+                   "六五：幹父之蠱，用譽。",
+                   "六四：裕父之蠱，往見吝。",
+                   "九三：幹父之蠱，小有悔，無大咎。",
+                   "九二：幹母之蠱，不可貞。",
+                   "初六：幹父之蠱，有子，考無咎，厲終吉。"
+               ]
+           ),
+           "yin yin yin yin yang yang": Gua(
+               composition: ["yin", "yin", "yin", "yin", "yang", "yang"],
+               name: "地澤臨",
+               guaExplanation: "元亨，利貞。至於八月有凶。",
+               yaoExplanations: [
+                   "上六：敦臨，吉，無咎。",
+                   "六五：知臨，大君之宜，吉。",
+                   "六四：至臨，無咎。",
+                   "六三：甘臨，無攸利。既憂之，無咎。",
+                   "九二：咸臨，吉，無不利。",
+                   "初九：咸臨，貞吉。"
+               ]
+           ),
+           "yang yang yin yin yin yin": Gua(
+               composition: ["yang", "yang", "yin", "yin", "yin", "yin"],
+               name: "風地觀",
+               guaExplanation: "盥而不薦，有孚顒若。",
+               yaoExplanations: [
+                   "上九：觀其生，君子無咎。",
+                   "九五：觀我生，君子無咎。",
+                   "六四：觀國之光，利用賓於王。",
+                   "六三：觀我生，進退。",
+                   "六二：闚觀，利女貞。",
+                   "初六：童觀，小人無咎，君子吝。"
+               ]
+           ),
+           "yang yin yang yin yin yang": Gua(
+               composition: ["yang", "yin", "yang", "yin", "yin", "yang"],
+               name: "火雷噬嗑",
+               guaExplanation: "亨。利用獄。",
+               yaoExplanations: [
+                   "上九：何校滅耳，凶。",
+                   "六五：噬乾肉，得黃金，貞厲，無咎。",
+                   "九四：噬乾胏，得金矢，利艱貞，吉。",
+                   "六三：噬腊肉，遇毒，小吝，無咎。",
+                   "六二：噬膚，滅鼻，無咎。",
+                   "初九：屨校滅趾，無咎。"
+               ]
+           ),
+           "yang yin yin yang yin yang": Gua(
+               composition: ["yang", "yin", "yin", "yang", "yin", "yang"],
+               name: "山火賁",
+               guaExplanation: "亨。小利有攸往。",
+               yaoExplanations: [
+                   "上九：白賁，無咎。",
+                   "六五：賁於丘園，束帛戔戔，吝，終吉。",
+                   "六四：賁如皤如，白馬翰如，匪寇婚媾。",
+                   "九三：賁如，濡如，永貞吉。",
+                   "六二：賁其須。",
+                   "初九：賁其趾，舍車而徒。"
+               ]
+           ),
+           "yang yin yin yin yin yin": Gua(
+               composition: ["yang", "yin", "yin", "yin", "yin", "yin"],
+               name: "山地剝",
+               guaExplanation: "不利有攸往。",
+               yaoExplanations: [
+                   "上九：碩果不食，君子得輿，小人剝廬。",
+                   "六五：貫魚，以宮人寵，無不利。",
+                   "六四：剝床以膚，凶。",
+                   "六三：剝之，無咎。",
+                   "六二：剝床以辨，蔑貞凶。",
+                   "初六：剝床以足，蔑貞凶。"
+               ]
+           ),
+           "yin yin yin yin yin yang": Gua(
+               composition: ["yin", "yin", "yin", "yin", "yin", "yang"],
+               name: "地雷復",
+               guaExplanation: "亨。出入無疾，朋來無咎。反復其道，七日來復，利有攸往。",
+               yaoExplanations: [
+                   "上六：迷復，凶，有災眚。用行師，終有大敗，以其國君，凶，至于十年不克征。",
+                   "六五：敦復，無悔。",
+                   "六四：中行獨復。",
+                   "六三：頻復，厲，無咎。",
+                   "六二：休復，吉。",
+                   "初九：不遠復，無祗悔，元吉。"
+               ]
+           ),
+           "yang yang yang yin yin yang": Gua(
+               composition: ["yang", "yang", "yang", "yin", "yin", "yang"],
+               name: "天雷無妄",
+               guaExplanation: "元亨，利貞。其匪正有眚，不利有攸往。",
+               yaoExplanations: [
+                   "上九：無妄，行有眚，無攸利。",
+                   "九五：無妄之疾，勿藥有喜。",
+                   "九四：可貞，無咎。",
+                   "六三：無妄之災，或繫之牛，行人之得，邑人之災。",
+                   "六二：不耕穫，不菑畬，則利有攸往。",
+                   "初九：無妄，往吉。"
+               ]
+           ),
+           "yang yin yin yang yang yang": Gua(
+               composition: ["yang", "yin", "yin", "yang", "yang", "yang"],
+               name: "山天大蓄",
+               guaExplanation: "利貞。不家食，吉。利涉大川。",
+               yaoExplanations: [
+                   "上九：何天之衢，亨。",
+                   "六五：豶豕之牙，吉。",
+                   "六四：童牛之牿，元吉",
+                   "九三：良馬逐，利艱貞。曰閑舆衛，利有攸往。",
+                   "九二：輿說輹。",
+                   "初九：有厲，利已。"
+               ]
+           ),
+           "yang yin yin yin yin yang": Gua(
+               composition: ["yang", "yin", "yin", "yin", "yin", "yang"],
+               name: "山雷頤",
+               guaExplanation: "貞吉。觀頤，自求口實。",
+               yaoExplanations: [
+                   "上九：由頤，厲吉。利涉大川。",
+                   "六五：拂經，居貞吉，不可涉大川。",
+                   "六四：顛頤，吉。虎視眈眈，其欲逐逐，無咎。",
+                   "六三：拂頤，貞凶。十年勿用，無攸利。",
+                   "六二：顛頤，拂經，於丘頤，征凶。",
+                   "初九：舍爾靈龜，觀我朵頤，凶。"
+               ]
+           ),
+           "yin yang yang yang yang yin": Gua(
+               composition: ["yin", "yang", "yang", "yang", "yang", "yin"],
+               name: "澤風大過",
+               guaExplanation: "棟橈，利有攸往，亨。",
+               yaoExplanations: [
+                   "上六：過涉滅頂，凶，無咎。",
+                   "九五：枯楊生華，老婦得其士夫，無咎無譽。",
+                   "九四：棟隆，吉；有它，吝。",
+                   "九三：棟橈，凶。",
+                   "九二：枯楊生稊，老夫得其女妻，無不利。",
+                   "初六：藉用白茅，無咎。"
+               ]
+           ),
+           "yin yang yin yin yang yin": Gua(
+               composition: ["yin", "yang", "yin", "yin", "yang", "yin"],
+               name: "坎",
+               guaExplanation: "習坎，有孚，維心亨，行有尚。",
+               yaoExplanations: [
+                   "上六：係用徵兇，有孚元吉，無咎。",
+                   "九五：坎不盈，祇既平，無咎。",
+                   "六四：樽酒簋貳，用缶，納約自牖，終無咎。",
+                   "六三：來之坎坎，險且枕，入于坎窞，勿用。",
+                   "九二：坎有險，求小得。",
+                   "初六：習坎，入于坎窞，凶。"
+               ]
+           ),
+           "yang yin yang yang yin yang": Gua(
+               composition: ["yang", "yin", "yang", "yang", "yin", "yang"],
+               name: "離",
+               guaExplanation: "利貞，亨。畜牝牛，吉。",
+               yaoExplanations: [
+                   "上九：王用出征，有嘉折首，獲匪其丑，無咎。",
+                   "六五：出涕沱若，戚嗟若，吉。",
+                   "九四：突如其來如，焚如，死如，棄如。",
+                   "九三：日昃之離，不鼓缶而歌，則大耋之嗟，凶。",
+                   "六二：黃離，元吉。",
+                   "初九：履錯然，敬之，無咎。"
+               ]
+           ),
+           //以上為上經，以下為下經
+           "yin yang yang yang yin yin": Gua(
+               composition: ["yin", "yang", "yang", "yang", "yin", "yin"],
+               name: "澤山咸",
+               guaExplanation: "亨，利貞，取女吉。",
+               yaoExplanations: [
+                   "上六：咸其輔頰舌。",
+                   "九五：咸其脢，無悔。",
+                   "九四：貞吉，悔亡，憧憧往來，朋從爾思。",
+                   "九三：咸其股，執其隨，往吝。",
+                   "六二：咸其腓，凶，居吉。",
+                   "初六：咸其拇。"
+               ]
+           ),
+           "yin yin yang yang yang yin": Gua(
+               composition: ["yin", "yin", "yang", "yang", "yang", "yin"],
+               name: "雷風恆",
+               guaExplanation: "亨，無咎，利貞。利有攸往。",
+               yaoExplanations: [
+                   "上六：振恆，凶。",
+                   "六五：恆其德，貞婦人吉，夫子凶。",
+                   "九四：田無禽。",
+                   "九三：不恆其德，或承之羞，貞吝。",
+                   "九二：悔亡。",
+                   "初六：浚恆，貞凶，無攸利"
+               ]
+           ),
+           "yang yang yang yang yin yin": Gua(
+               composition: ["yang", "yang", "yang", "yang", "yin", "yin"],
+               name: "天山遯",
+               guaExplanation: "亨，小利貞。",
+               yaoExplanations: [
+                   "上九：肥遯，無不利。",
+                   "九五：嘉遯，貞吉。",
+                   "九四：好遯，君子吉，小人否。",
+                   "九三：係遯，有疾厲，畜臣妾吉。",
+                   "六二：執之用黃牛之革，莫之勝說。",
+                   "初六：遯尾，厲，勿用有攸往。"
+               ]
+           ),
+           "yin yin yang yang yang yang": Gua(
+               composition: ["yin", "yin", "yang", "yang", "yang", "yang"],
+               name: "雷天大壯",
+               guaExplanation: "利貞。",
+               yaoExplanations: [
+                   "上六：羝羊觸藩，不能退，不能遂，無攸利，艱則吉。",
+                   "六五：喪羊於易，無悔。",
+                   "九四：貞吉，悔亡，藩決不羸，壯於大輿之輹。",
+                   "九三：小人用壯，君子用罔，貞厲。羝羊觸藩，羸其角。",
+                   "九二：貞吉。",
+                   "初九：壯於趾，徵凶，有孚。"
+               ]
+           ),
+           "yang yin yang yin yin yin": Gua(
+               composition: ["yang", "yin", "yang", "yin", "yin", "yin"],
+               name: "火地晉",
+               guaExplanation: "康侯用錫馬蕃庶，晝日三接。",
+               yaoExplanations: [
+                   "上九：晉其角，維用伐邑，厲吉無咎，貞吝。",
+                   "六五：悔亡，失得勿恤，往吉，無不利。",
+                   "九四：晉如鼫鼠，貞厲。",
+                   "六三：眾允，悔亡。",
+                   "六二：晉如愁如，貞吉，受茲介福于其王母。",
+                   "初六：晉如摧如，貞吉，罔孚，裕無咎。"
+               ]
+           ),
+           "yin yin yin yang yin yang": Gua(
+               composition: ["yin", "yin", "yin", "yang", "yin", "yang"],
+               name: "地火明夷",
+               guaExplanation: "利艱貞。",
+               yaoExplanations: [
+                   "上六：不明晦，初登於天，後入於地。",
+                   "六五：箕子之明夷，利貞。",
+                   "六四：入於左腹，獲明夷之心，於出門庭。",
+                   "九三：明夷於南狩，得其大首，不可疾貞。",
+                   "六二：明夷，夷於左股，用拯馬壯，吉。",
+                   "初九：明夷於飛，垂其翼，君子於行，三日不食，有攸往，主人有言。"
+               ]
+           ),
+           "yang yang yin yang yin yang": Gua(
+               composition: ["yang", "yang", "yin", "yang", "yin", "yang"],
+               name: "風火家人",
+               guaExplanation: "利女貞。",
+               yaoExplanations: [
+                   "上九：有孚威如，終吉。",
+                   "九五：王假有家，勿恤，吉。",
+                   "六四：富家，大吉。",
+                   "九三：家人嗃嗃，悔厲，吉；婦子嘻嘻，終吝。",
+                   "六二：無攸遂，在中饋，貞吉。",
+                   "初九：閑有家，悔亡。"
+               ]
+           ),
+           "yang yin yang yin yang yang": Gua(
+               composition: ["yang", "yin", "yang", "yin", "yang", "yang"],
+               name: "火澤睽",
+               guaExplanation: "小事吉。",
+               yaoExplanations: [
+                   "上九：睽孤，見豕負塗，載鬼一車，先張之弧，後說之弧，匪寇婚媾，往遇雨則吉。",
+                   "六五：悔亡，厥宗噬膚，往何咎？",
+                   "九四：睽孤，遇元夫，交孚，厲無咎。",
+                   "六三：見輿曳，其牛掣，其人天且劓，無初有終。",
+                   "九二：遇主於巷，無咎。",
+                   "初九：悔亡，喪馬勿逐，自復，見惡人無咎。"
+               ]
+           ),
+           "yin yang yin yang yin yin": Gua(
+               composition: ["yin", "yang", "yin", "yang", "yin", "yin"],
+               name: "水山蹇",
+               guaExplanation: "利西南，不利東北。利見大人，貞吉。",
+               yaoExplanations: [
+                   "上六：往蹇來碩，吉，利見大人。",
+                   "九五：大蹇，朋來",
+                   "六四：往蹇來連。",
+                   "九三：往蹇來反。",
+                   "六二：王臣蹇蹇，匪躬之故。",
+                   "初六：往蹇來譽。"
+               ]
+           ),
+           "yin yin yang yin yang yin": Gua(
+               composition: ["yin", "yin", "yang", "yin", "yang", "yin"],
+               name: "雷水解",
+               guaExplanation: "利西南，無所往，其來復吉。有攸往，夙吉。",
+               yaoExplanations: [
+                   "上六：公用射隼於高墉之上，獲之，無不利。",
+                   "六五：君子維有解，吉，有孚于小人。",
+                   "九四：解而拇，朋至斯孚。",
+                   "六三：負且乘，致寇至，貞吝。",
+                   "九二：田獲三狐，得黃矢，貞吉。",
+                   "初六：無咎。"
+               ]
+           ),
+           "yang yin yin yin yang yang": Gua(
+               composition: ["yang", "yin", "yin", "yin", "yang", "yang"],
+               name: "山澤損",
+               guaExplanation: "孚，元吉，無咎，可貞，利有攸往。曷之用二簋可用享。",
+               yaoExplanations: [
+                   "上九：弗損，益之，無咎，貞吉，利有攸往，得臣無家。",
+                   "六五：或益之十朋之龜，弗克違，元吉。",
+                   "六四：損其疾，使遄有喜，無咎。",
+                   "六三：三人行則損一人，一人行則得其友。",
+                   "九二：利貞，徵凶，弗損益之。",
+                   "初九：已事遄往，無咎，酌損之。"
+               ]
+           ),
+           "yang yang yin yin yin yang": Gua(
+               composition: ["yang", "yang", "yin", "yin", "yin", "yang"],
+               name: "風雷益",
+               guaExplanation: "利有攸往，利涉大川。",
+               yaoExplanations: [
+                   "上九：莫益之，或擊之，立心勿恆，凶。",
+                   "九五：有孚惠心，勿問元吉。有孚惠我德。",
+                   "六四：中行，告公從，利用為依遷國。",
+                   "六三：益之用凶事，無咎。有孚，中行告公用圭。",
+                   "六二：或益之十朋之龜，弗克違，永貞吉，王用享于帝，吉。",
+                   "初九：利用為大作，元吉，無咎。"
+               ]
+           ),
+           "yin yang yang yang yang yang": Gua(
+               composition: ["yin", "yang", "yang", "yang", "yang", "yang"],
+               name: "澤天夬",
+               guaExplanation: "揚於王庭，孚號，有厲，告自邑，不利即戎，利有攸往。",
+               yaoExplanations: [
+                   "上六：無號，終有凶。",
+                   "九五：莧陸夬夬，中行無咎。",
+                   "九四：臀無膚，其行次且。牽羊悔亡，聞言不信。",
+                   "九三：壯於頄，有凶，君子夬夬，獨行遇雨若，若濡有慍，無咎。",
+                   "九二：惕號，莫夜有戎，勿恤。",
+                   "初九：壯於前趾，往不勝為咎。"
+               ]
+           ),
+           "yang yang yang yang yang yin": Gua(
+               composition: ["yang", "yang", "yang", "yang", "yang", "yin"],
+               name: "天風姤",
+               guaExplanation: "女壯，勿用取女。",
+               yaoExplanations: [
+                   "上九：姤其角，吝，無咎。",
+                   "九五：以杞包瓜，含章，有隕自天。",
+                   "九四：包無魚，起凶。",
+                   "九三：臀無膚，其行次且，厲，無大咎。",
+                   "九二：包有魚，無咎，不利賓。",
+                   "初六：系于金柅，貞吉，有攸往，見凶，羸豕孚蹢躅。"
+               ]
+           ),
+           "yin yang yang yin yin yin": Gua(
+               composition: ["yin", "yang", "yang", "yin", "yin", "yin"],
+               name: "澤地萃",
+               guaExplanation: "亨，王假有廟，利見大人，亨，利貞，用大牲吉，利有攸往。",
+               yaoExplanations: [
+                   "上六：齎咨涕洟，無咎。",
+                   "九五：萃有位，無咎。匪孚，元永貞，悔亡。",
+                   "九四：大吉無咎。",
+                   "六三：萃如，嗟如，無攸利，往無咎，小吝。",
+                   "六二：引吉，無咎，孚乃利用禴",
+                   "初六：有孚不終，乃亂乃萃，若號，一握為笑，勿恤，往無咎。"
+               ]
+           ),
+           "yin yin yin yang yang yin": Gua(
+               composition: ["yin", "yin", "yin", "yang", "yang", "yin"],
+               name: "地風升",
+               guaExplanation: "元亨，用見大人，勿恤，南征吉。",
+               yaoExplanations: [
+                   "上六：冥升，利於不息之貞。",
+                   "六五：貞吉，升階。",
+                   "六四：王用亨于岐山，吉無咎。",
+                   "九三：升虛邑。",
+                   "九二：孚乃利用禴，無咎。",
+                   "初六：允升，大吉。"
+               ]
+           ),
+           "yin yang yang yin yang yin": Gua(
+               composition: ["yin", "yang", "yang", "yin", "yang", "yin"],
+               name: "澤水困",
+               guaExplanation: "亨，貞大人吉，無咎，有言不信。",
+               yaoExplanations: [
+                   "上六：困于葛藟，于臲卼，曰動悔有悔，征吉。",
+                   "九五：劓刖，困于赤紱，乃徐有說，利用祭祀。",
+                   "九四：來徐徐，困于金車，吝，有終。",
+                   "六三：困于石，據于蒺藜，入于其宮，不見其妻，凶。",
+                   "九二：困于酒食，朱紱方來，利用享祀，征凶，無咎。",
+                   "初六：臀困于株木，入于幽谷，三歲不覿。"
+               ]
+           ),
+           "yin yang yin yang yang yin": Gua(
+               composition: ["yin", "yang", "yin", "yang", "yang", "yin"],
+               name: "水風井",
+               guaExplanation: "改邑不改井，無喪無得。往來井井，汔至亦未繘井，羸其瓶，凶。",
+               yaoExplanations: [
+                   "上六：井收勿幕，有孚元吉。",
+                   "九五：井冽，寒泉食。",
+                   "六四：井甃，無咎。",
+                   "九三：井渫不食，為我心惻，可用汲，王明並受其福。",
+                   "九二：井谷射鮒，瓷井不食，動恆吉。",
+                   "初六：井泥不食，舊井無禽。"
+               ]
+           ),
+           "yin yang yang yang yin yang": Gua(
+               composition: ["yin", "yang", "yang", "yang", "yin", "yang"],
+               name: "澤火革",
+               guaExplanation: "己日乃孚，元亨，利貞，悔亡。",
+               yaoExplanations: [
+                   "上六：君子豹變，小人革面，征凶，居貞吉。",
+                   "九五：大人虎變，未占有孚。",
+                   "九四：悔亡，有孚改命，吉。",
+                   "九三：征凶，貞厲，革言三就，有孚。",
+                   "六二：己日乃革之，征吉，無咎。",
+                   "初九：鞏用黃牛之革。"
+               ]
+           ),
+           "yang yin yang yang yang yin": Gua(
+               composition: ["yang", "yin", "yang", "yang", "yang", "yin"],
+               name: "火風鼎",
+               guaExplanation: "元吉，亨。",
+               yaoExplanations: [
+                   "上六：上九：鼎玉鉉，大吉，無不利。",
+                   "六五：鼎黃耳金鉉，利貞。",
+                   "九四：鼎折足，覆公餗，其形渥，凶。",
+                   "九三：鼎耳革，其行塞，雉膏不食，方雨虧悔，終吉",
+                   "九二：鼎有實，我仇有疾，不我能即，吉。",
+                   "初六：鼎顛趾，利出否，得妾以其子，無咎。"
+               ]
+           ),
+           "yin yin yang yin yin yang": Gua(
+               composition: ["yin", "yin", "yang", "yin", "yin", "yang"],
+               name: "震",
+               guaExplanation: "亨。震來虩虩，笑言啞啞，震驚百里，不喪匕鬯。",
+               yaoExplanations: [
+                   "上六：震索索，視矍矍，征凶，震不于其躬，于其鄰，無咎，婚媾有言。",
+                   "六五：震往來厲，億無喪，有事。",
+                   "九四：震遂泥。",
+                   "六三：震蘇蘇，震行無眚。",
+                   "六二：震來厲，億喪貝，躋于九陵，勿逐，七日得。",
+                   "初九：震來虩虩，後笑言啞啞，吉。"
+               ]
+           ),
+           "yang yin yin yang yin yin": Gua(
+               composition: ["yang", "yin", "yin", "yang", "yin", "yin"],
+               name: "艮",
+               guaExplanation: "其背，不獲其身，行其庭，不見其人，無咎。",
+               yaoExplanations: [
+                   "上九：敦艮，吉。",
+                   "六五：艮其輔，言有序，悔亡。",
+                   "六四：艮其身，無咎。",
+                   "九三：艮其限，列其夤，厲熏心。",
+                   "六二：艮其腓，不拯其隨，其心不快。",
+                   "初六：艮其趾，無咎，利永貞。"
+               ]
+           ),
+           "yang yang yin yang yin yin": Gua(
+               composition: ["yang", "yang", "yin", "yang", "yin", "yin"],
+               name: "風山漸",
+               guaExplanation: "女歸吉，利貞。",
+               yaoExplanations: [
+                   "上九：鴻漸于陸，其羽可用為儀，吉。",
+                   "九五：鴻漸于陵，婦三歲不孕，終莫之勝，吉。",
+                   "六四：鴻漸于木，或得其桷，無咎。",
+                   "九三：鴻漸于陸，夫征不復，婦孕不育，凶。利禦寇。",
+                   "六二：鴻漸于磐，飲食衎衎，吉。",
+                   "初六：鴻漸于干，小子厲，有言，無咎。"
+               ]
+           ),
+           "yin yin yang yin yang yang": Gua(
+               composition: ["yin", "yin", "yang", "yin", "yang", "yang"],
+               name: "雷澤歸妹",
+               guaExplanation: "征凶，無攸利。",
+               yaoExplanations: [
+                   "上六：女承筐無實，士刲羊無血，無攸利。",
+                   "六五：帝乙歸妹，其君之袂，不如其娣之袂良，月幾望，吉。",
+                   "九四：歸妹愆期，遲歸有時。",
+                   "六三：歸妹以須，反歸以娣。",
+                   "九二：眇能視，利幽人之貞。",
+                   "初九：歸妹以娣，跛能履，征吉。"
+               ]
+           ),
+           "yin yin yang yang yin yang": Gua(
+               composition: ["yin", "yin", "yang", "yang", "yin", "yang"],
+               name: "雷火豐",
+               guaExplanation: "亨，王假之，勿憂，宜日中。",
+               yaoExplanations: [
+                   "上六：豐其屋，蔀其家，闚其戶，闃其無人，三歲不覿，凶。",
+                   "六五：六五：來章，有慶譽，吉。",
+                   "九四：豐其蔀，日中見斗，遇其夷主，吉。",
+                   "九三：豐其沛，日中見昧，折其右肱，無咎。",
+                   "六二：豐其蔀，日中見斗，往得疑疾，有孚發若，吉。",
+                   "初九：遇其配主，雖旬無咎，往有尚。"
+               ]
+           ),
+           "yang yin yang yang yin yin": Gua(
+               composition: ["yang", "yin", "yang", "yang", "yin", "yin"],
+               name: "火山旅",
+               guaExplanation: "小亨，旅貞吉。",
+               yaoExplanations: [
+                   "上六：上九：鳥焚其巢，旅人先笑後號咷，喪牛于易，凶。",
+                   "六五：射雉，一矢亡，終以譽命。",
+                   "九四：旅于處，得其資斧，我心不快。",
+                   "九三：旅焚其次，喪其童僕，貞厲。",
+                   "六二：旅即次，懷其資，得童僕貞。",
+                   "初六：旅瑣瑣，斯其所取災。"
+               ]
+           ),
+           "yang yang yin yang yang yin": Gua(
+               composition: ["yang", "yang", "yin", "yang", "yang", "yin"],
+               name: "巽",
+               guaExplanation: "小亨，利有攸往，利見大人。",
+               yaoExplanations: [
+                   "上六：上九：巽在床下，喪其資斧，貞凶。",
+                   "六五：九五：貞吉，悔亡，無不利，無初有終，先庚三日，後庚三日，吉。",
+                   "六四：悔亡，田獲三品。",
+                   "九三：頻巽，吝。",
+                   "九二：巽在床下，用史巫紛若，吉，無咎。",
+                   "初六：進退，利武人之貞。"
+               ]
+           ),
+           "yin yang yang yin yang yang": Gua(
+               composition: ["yin", "yang", "yang", "yin", "yang", "yang"],
+               name: "兑",
+               guaExplanation: "亨，利貞。",
+               yaoExplanations: [
+                   "上六：引兌。",
+                   "九五：孚于剝，有厲。",
+                   "九四：商兌未寧，介疾有喜。",
+                   "六三：來兌，凶。",
+                   "九二：孚兌，吉，悔亡。",
+                   "初九：和兌，吉。"
+               ]
+           ),
+           "yang yang yin yin yang yin": Gua(
+               composition: ["yang", "yang", "yin", "yin", "yang", "yin"],
+               name: "風水渙",
+               guaExplanation: "亨。王假有廟，利涉大川，利貞。",
+               yaoExplanations: [
+                   "上九：渙其血，去逖出，無咎。",
+                   "九五：渙汗其大號，渙王居，無咎。",
+                   "六四：渙其群，元吉。渙有丘，匪夷所思。",
+                   "六三：渙其躬，無悔。",
+                   "九二：渙奔其機，悔亡。",
+                   "初六：用拯馬壯，吉。"
+               ]
+           ),
+           "yin yang yin yin yang yang": Gua(
+               composition: ["yin", "yang", "yin", "yin", "yang", "yang"],
+               name: "水澤節",
+               guaExplanation: "亨。苦節不可貞。",
+               yaoExplanations: [
+                   "上六：苦節，貞凶，悔亡。",
+                   "九五：甘節，吉，往有尚。",
+                   "六四：安節，亨。",
+                   "六三：不節若，則嗟若，無咎。",
+                   "九二：不出門庭，凶。",
+                   "初九：不出戶庭，無咎。"
+               ]
+           ),
+           "yang yang yin yin yang yang": Gua(
+               composition: ["yang", "yang", "yin", "yin", "yang", "yang"],
+               name: "風澤中孚",
+               guaExplanation: "豚魚吉，利涉大川，利貞。",
+               yaoExplanations: [
+                   "上九：翰音登于天，貞凶。",
+                   "九五：有孚攣如，無咎。",
+                   "六四：月幾望，馬匹亡，無咎。",
+                   "六三：得敵，或鼓或罷，或泣或歌。",
+                   "九二：鳴鶴在陰，其子和之。我有好爵，吾與爾靡之。",
+                   "初九：虞吉，有它不燕。"
+               ]
+           ),
+           "yin yin yang yang yin yin": Gua(
+               composition: ["yin", "yin", "yang", "yang", "yin", "yin"],
+               name: "雷山小過",
+               guaExplanation: "亨。利貞，可小事，不可大事。飛鳥遺之音，不宜上，宜下，大吉。",
+               yaoExplanations: [
+                   "上六：弗遇過之，飛鳥離之，凶，是謂災眚。",
+                   "六五：密雲不雨，自我西郊，公弋取彼在穴。",
+                   "九四：無咎，弗過遇之。往厲必戒，勿用永貞。",
+                   "九三：弗過防之，從或戕之，凶。",
+                   "六二：過其祖，遇其妣；不及其君，遇其臣，無咎。",
+                   "初六：飛鳥以凶。"
+               ]
+           ),
+           "yin yang yin yang yin yang": Gua(
+               composition: ["yin", "yang", "yin", "yang", "yin", "yang"],
+               name: "水火既濟",
+               guaExplanation: "亨，小利貞，初吉終亂。",
+               yaoExplanations: [
+                   "上六：濡其首，厲。",
+                   "九五：東鄰殺牛，不如西鄰之禴祭，實受其福。",
+                   "六四：繻有衣袽，終日戒。",
+                   "九三：高宗伐鬼方，三年克之，小人勿用。",
+                   "六二：婦喪其茀，勿逐，七日得。",
+                   "初九：曳其輪，濡其尾，無咎。"
+               ]
+           ),
+           "yang yin yang yin yang yin": Gua(
+               composition: ["yang", "yin", "yang", "yin", "yang", "yin"],
+               name: "火水未濟",
+               guaExplanation: "亨。小狐汔濟，濡其尾，無攸利。",
+               yaoExplanations: [
+                   "上九：有孚于飲酒，無咎。濡其首，有孚失是。",
+                   "六五：貞吉，無悔，君子之光，有孚吉。",
+                   "九四：貞吉，悔亡，震用伐鬼方，三年有賞于大國。",
+                   "六三：未濟，征凶，利涉大川。",
+                   "九二：曳其輪，貞吉。",
+                   "初六：濡其尾，吝。"
+               ]
+           ),
+           // Add the other 62 Gua definitions here...
+       ]`;
+
+// Parse the Swift-like text into a JavaScript object compatible with this web app
+// 新版：所有 key 統一為初→上，且只註冊一個 canonical key，避免顛倒卦覆蓋
+function parseSwiftGuaDictionary(src) {
+  const dict = {};
+  const entryRe = /"((?:yin|yang)(?:\s+(?:yin|yang)){5})"\s*:\s*Gua\(([^]*?)\)\s*,?/g;
+  let m;
+  while ((m = entryRe.exec(src)) !== null) {
+    const body = m[2];
+    const name = (body.match(/name:\s*"([^"]+)"/) || [])[1] || '';
+    const guaExplanation = (body.match(/guaExplanation:\s*"([^"]+)"/) || [])[1] || '';
+    const yaoBlock = (body.match(/yaoExplanations:\s*\[([^]*?)\]/) || [])[1] || '';
+    const compBlock = (body.match(/composition:\s*\[([^\]]+)\]/) || [])[1] || '';
+
+    // 1) 解析爻辭：Swift 常用上→初，轉成初→上以利索引
+    const yao = [];
+    const lineRe = /"([^\"]*)"/g;
+    let lm;
+    while ((lm = lineRe.exec(yaoBlock)) !== null) {
+      let text = lm[1].trim();
+      text = text.replace(/^(初六|初九|六二|六三|六四|六五|上六|九二|九三|九四|九五|上九)：\s*\1：/, '$1：');
+      yao.push(text);
+    }
+    const yaoReordered = yao.slice().reverse(); // 初→上
+
+    // 2) 解析 composition，並 **統一轉成初→上** 的 key
+    const comps = [];
+    const compRe = /"(yin|yang)"/g;
+    let cm;
+    while ((cm = compRe.exec(compBlock)) !== null) comps.push(cm[1]);
+    // 多數資料是上→初，因此採用反轉作為**唯一**鍵（初→上）
+    const canonicalKey = comps.length === 6 ? comps.slice().reverse().join(' ') : null;
+    if (!canonicalKey) continue;
+
+    // 3) 僅註冊**單一**規範鍵，避免與互為倒序的卦互相覆蓋
+    if (!dict[canonicalKey]) {
+      dict[canonicalKey] = { name, guaExplanation, yaoExplanations: yaoReordered };
+    }
+  }
+  return dict;
+}
+
+const guaDictionary = parseSwiftGuaDictionary(SWIFT_SOURCE);
+
+        function showExplanation() {
+            alert(`使用說明：\n- 本程式模擬蓍草占卦。\n- 請遵守「不誠不占，不義不占，不疑不占」之原則。\n- 一次詢問一個問題，多個問題可分開詢問。\n- 本卦代表現在的狀態，之卦代表變化的方向。\n- 陰陽變化為爻變，以紅色標示（本卦）。\n- 若無變爻則本卦與之卦同象。\n- 解卦依爻變有不同判讀。`);
+        }
+
+        function generatePrediction() {
+            const userName = document.getElementById("userName").value.trim();
+            const userQuestion = document.getElementById("userQuestion").value.trim();
+            const resultText = `假爾泰筮有常 ${userName || '某'} ${userQuestion || ''} 未知可否，爰質所疑於神之靈吉凶、得失、悔吝、憂虞惟爾有神 尚明告之。`;
+            document.getElementById("resultText").innerText = resultText;
+        }
+
+        // === Yarrow-stalk method (大衍筮法) ===
+        function calculateYao() {
+            function oneOperation(sticks) {
+                const left = Math.floor(Math.random() * (sticks - 1)) + 1; // 1..sticks-1
+                const right = sticks - left;
+                let rL = (left - 1) % 4; if (rL === 0) rL = 4; // remove 1 first on left
+                let rR = right % 4;      if (rR === 0) rR = 4;
+                return 1 + rL + rR; // removed count this round
+            }
+            let total = 49;
+            for (let i = 0; i < 3; i++) total -= oneOperation(total);
+            return Math.floor(total / 4); // 6(old yin),7(young yang),8(young yin),9(old yang)
+        }
+
+        function castSixLines() {
+            const six = [];
+            for (let i = 0; i < 6; i++) six.push(calculateYao());
+            return six; // array of 6..9
+        }
+
+        function toLogicalAndImages(six) {
+            const hLogical = Array(6);
+            const gLogical = Array(6);
+            const isChanging = Array(6).fill(false);
+
+            for (let i = 0; i < 6; i++) {
+                const v = six[i];
+                if (v === 6) { hLogical[i] = 'yin';  gLogical[i] = 'yang'; isChanging[i] = true; }
+                if (v === 7) { hLogical[i] = 'yang'; gLogical[i] = 'yang'; }
+                if (v === 8) { hLogical[i] = 'yin';  gLogical[i] = 'yin'; }
+                if (v === 9) { hLogical[i] = 'yang'; gLogical[i] = 'yin';  isChanging[i] = true; }
+            }
+            return { hLogical, gLogical, isChanging };
+        }
+
+        function renderLines(container, logical, changingFlags, markChanges) {
+            container.innerHTML = '';
+            // 由上（六）到下（初）畫線
+            for (let pos = 5; pos >= 0; pos--) {
+                const base = logical[pos]; // 'yin' 或 'yang'
+                const isChg = !!changingFlags[pos];
+                const div = document.createElement('div');
+                if (markChanges && isChg) {
+                    div.className = `yao-line ${base === 'yin' ? 'yin6' : 'yang9'}`;
+                } else {
+                    div.className = `yao-line ${base}`;
+                }
+                container.appendChild(div);
+            }
+        }
+
+        function keyFromLogical(logical) {
+            // 規範鍵與字典一致：皆採「初→上」順序
+            // 這裡 **不要反轉**，直接以初→上產生 key，才能與 iOS 版對齊
+            return logical.join(' ');
+        }
+
+        function yaoLabel(idx, base) {
+          // idx: 0..5 (初..上) ; base: 'yin' | 'yang' 取本卦陰陽決定六/九
+          if (idx === 0) return base === 'yin' ? '初六' : '初九';
+          if (idx === 5) return base === 'yin' ? '上六' : '上九';
+          const pos = ['二','三','四','五'][idx - 1];
+          return (base === 'yin' ? '六' : '九') + pos;
+        }
+
+        function extractSpecialUse(text, label) {
+          // 從卦辭中擷取「用九」或「用六」一句
+          if (!text) return '';
+          const i = text.indexOf(label + '：');
+          if (i < 0) return '';
+          const j = text.indexOf('。', i + 2);
+          return j > i ? text.slice(i, j + 1) : text.slice(i);
+        }
+
+        function composeReading({ changes, hData, gData, hLogical, gLogical, isChanging }) {
+          const parts = [];
+          switch (changes) {
+            case 0: {
+              // 0 變：本卦卦辭
+              parts.push(`本卦：${hData.guaExplanation || ''}`);
+              break;
+            }
+            case 1:
+            case 2: {
+              // 1/2 變：顯示本卦相應爻辭（直接使用資料內含的標籤「初九/九二…」）
+              for (let i = 0; i < 6; i++) {
+                if (isChanging[i]) {
+                  const yao = (hData.yaoExplanations && hData.yaoExplanations[i]) || '';
+                  parts.push(`本卦 ${yao}`);
+                }
+              }
+              break;
+            }
+            case 3: {
+              // 3 變：先本卦卦辭，再之卦卦辭（與 iOS 一致）
+              parts.push(`本卦：${hData.guaExplanation || ''}`);
+              parts.push(`之卦：${gData.guaExplanation || ''}`);
+              break;
+            }
+            case 4: {
+              // 4 變：顯示「之卦」兩條未變爻的爻辭
+              const unchanging = [];
+              for (let i = 0; i < 6; i++) if (!isChanging[i]) unchanging.push(i);
+              // Web 版內部為「初→上」（0=初、5=上），iOS 先顯示「靠近初」者，再顯示「靠近上」者
+              if (unchanging.length === 2) {
+                const [iLower, iUpper] = unchanging.slice().sort((a, b) => a - b);
+                const y1 = (gData.yaoExplanations && gData.yaoExplanations[iLower]) || '';
+                const y2 = (gData.yaoExplanations && gData.yaoExplanations[iUpper]) || '';
+                parts.push(`之卦 ${y1}`);
+                parts.push(`之卦 ${y2}`);
+              } else {
+                parts.push(`之卦：${gData.guaExplanation || ''}`);
+              }
+              break;
+            }
+            case 5: {
+              // 5 變：顯示「之卦」唯一未變爻之爻辭
+              const idx = isChanging.findIndex(v => !v);
+              if (idx >= 0) {
+                const yao = (gData.yaoExplanations && gData.yaoExplanations[idx]) || '';
+                parts.push(`之卦 ${yao}`);
+              } else {
+                parts.push(`之卦：${gData.guaExplanation || ''}`);
+              }
+              break;
+            }
+            case 6: {
+              // 6 變：顯示之卦卦辭，並列出乾卦用九與坤卦用六（與 iOS 一致）
+              parts.push(`之卦：${gData.guaExplanation || ''}`);
+              const qian = guaDictionary['yang yang yang yang yang yang'];
+              const kun  = guaDictionary['yin yin yin yin yin yin'];
+              if (qian) parts.push(`乾卦用九 ${qian.guaExplanation || ''}`);
+              if (kun)  parts.push(`坤卦用六 ${kun.guaExplanation || ''}`);
+              break;
+            }
+            default: {
+              parts.push(`${changes} 變：本卦/之卦參看爻辭與卦辭。`);
+            }
+          }
+          return parts;
+        }
+
+        function startCasting() {
+            const six = castSixLines();
+            const { hLogical, gLogical, isChanging } = toLogicalAndImages(six);
+
+            const hKey = keyFromLogical(hLogical);
+            const gKey = keyFromLogical(gLogical);
+
+            const hData = guaDictionary[hKey] || guaDictionary.example || { name: '（未建資料）', guaExplanation: '' };
+            const gData = guaDictionary[gKey] || guaDictionary.example2 || { name: '（未建資料）', guaExplanation: '' };
+
+            document.getElementById('hGuaName').innerText = hData.name || '';
+            document.getElementById('gGuaName').innerText = gData.name || '';
+
+            renderLines(document.getElementById('hGuaImages'), hLogical, isChanging, true);
+            renderLines(document.getElementById('gGuaImages'), gLogical, isChanging, true);
+
+            const changes = isChanging.filter(Boolean).length;
+            const explain = composeReading({ changes, hData, gData, hLogical, gLogical, isChanging });
+            // 用 <br> 分段顯示
+            document.getElementById('guaExplanation').innerHTML = explain.map(s => s.trim()).filter(Boolean).join('<br><br>');
+
+            document.getElementById('castTime').innerText = `起卦時間：${new Date().toLocaleString()}`;
+        }
+
+        document.getElementById('btnStart').addEventListener('click', startCasting);
+
+        document.getElementById('btnShot').addEventListener('click', async () => {
+            const { default: html2canvas } = await import('https://cdn.skypack.dev/html2canvas');
+            const main = document.querySelector('.app-container');
+            const canvas = await html2canvas(main);
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'yijing.png'; a.click();
+                URL.revokeObjectURL(url);
+            });
+        });
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('sw.js')
+                    .then(function (registration) {
+                        console.log('ServiceWorker registration successful with scope:', registration.scope);
+                    }, function (err) {
+                        console.log('ServiceWorker registration failed:', err);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>

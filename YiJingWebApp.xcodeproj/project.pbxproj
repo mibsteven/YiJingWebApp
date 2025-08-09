@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		B193E5832CCCA5F200294128 /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = index.html; sourceTree = "<group>"; };
+		B193E5852CCCE16700294128 /* AssetYiJing.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = AssetYiJing.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -15,6 +16,7 @@
 			isa = PBXGroup;
 			children = (
 				B193E5832CCCA5F200294128 /* index.html */,
+				B193E5852CCCE16700294128 /* AssetYiJing.xcassets */,
 			);
 			sourceTree = "<group>";
 		};
