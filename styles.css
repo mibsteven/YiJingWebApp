@@ -337,6 +337,27 @@ h2 {
     background: rgba(255, 255, 255, 0.42);
 }
 
+.site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 12px;
+    margin-top: 22px;
+    color: rgba(76, 68, 58, 0.78);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif;
+    font-size: 0.88rem;
+}
+
+.site-footer a {
+    color: var(--jade);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    text-decoration: underline;
+}
+
 .dialog {
     width: min(calc(100% - 36px), 520px);
     border: 1px solid var(--line);
