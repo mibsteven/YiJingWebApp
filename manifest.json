@@ -1,0 +1,22 @@
+{
+    "name": "周易",
+    "short_name": "周易",
+    "description": "以大衍筮法為核心的周易起卦 Web App",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#f8f5ee",
+    "theme_color": "#17130f",
+    "icons": [
+        {
+            "src": "assets/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "assets/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
