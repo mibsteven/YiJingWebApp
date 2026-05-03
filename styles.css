@@ -46,11 +46,19 @@ button {
 }
 
 .app-header {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 56px 18px;
+}
+
+.brand-lockup {
+    display: inline-grid;
+    grid-template-columns: auto auto;
     gap: 14px;
     align-items: center;
-    padding: 10px 0 18px;
+    justify-content: center;
 }
 
 .brand-mark {
@@ -110,6 +118,11 @@ h2 {
     cursor: pointer;
     font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "PingFang TC", sans-serif;
     font-weight: 800;
+}
+
+.app-header > .icon-button {
+    position: absolute;
+    right: 0;
 }
 
 .icon-button:focus-visible,
@@ -359,6 +372,14 @@ h2 {
 @media (max-width: 720px) {
     .app-shell {
         padding-inline: 14px;
+    }
+
+    .app-header {
+        padding-inline: 50px;
+    }
+
+    .brand-lockup {
+        gap: 12px;
     }
 
     .field-grid,
